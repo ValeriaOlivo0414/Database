@@ -158,7 +158,7 @@ app.mainloop()
 
 # Cerrar la conexión a la base de datos al cerrar la aplicación
 db_connector.disconnect()
-[27/7 12:26 p. m.] Kel: -- Tabla para almacenar información del estudiante
+-- Tabla para almacenar información del estudiante
 CREATE TABLE Estudiante (
     Documento VARCHAR(20) PRIMARY KEY,
     Nombre VARCHAR(100),
