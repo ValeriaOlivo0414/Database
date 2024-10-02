@@ -1,0 +1,329 @@
+import mysql.connector
+import tkinter as tk
+from tkinter import ttk, messagebox
+from tabulate import tabulate
+from datetime import datetime
+
+# Clase del Código 2 para la segunda ventana
+class SecondWindow(tk.Toplevel):
+    def _init_(self, db_connector):
+        super()._init_()
+        self.db_connector = db_connector
+        self.title("Lectura con Código de Barras")
+        self.geometry("1000x600")
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        # Frame principal
+        main_frame = ttk.Frame(self, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Campo para el código de barras
+        barcode_frame = tk.LabelFrame(main_frame, text="Escanear Código de Barras", padx=10, pady=10)
+        barcode_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        self.barcode_entry = ttk.Entry(barcode_frame, width=40)
+        self.barcode_entry.grid(row=0, column=0, padx=5, pady=5)
+        self.barcode_entry.bind("<Return>", self.handle_barcode_scan)
+
+        # Campo para ingresar la fecha y grado
+        filter_frame = tk.LabelFrame(main_frame, text="Filtrar por Fecha y Grado", padx=10, pady=10)
+        filter_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+
+        # Filtro de fecha y grado en la misma fila
+        ttk.Label(filter_frame, text="Fecha:").grid(row=0, column=0, padx=5, pady=5,
+                                                    sticky='w')  # Etiqueta para la fecha
+        self.date_entry = ttk.Entry(filter_frame, width=20)  # Campo de entrada para la fecha
+        self.date_entry.grid(row=0, column=1, padx=5, pady=5)  # Colocado en la misma fila, columna 1
+
+        ttk.Label(filter_frame, text="Grado:").grid(row=0, column=2, padx=5, pady=5,
+                                                    sticky='w')  # Etiqueta para el grado
+        self.grade_entry = ttk.Entry(filter_frame, width=20)  # Campo de entrada para el grado
+        self.grade_entry.grid(row=0, column=3, padx=5, pady=5)  # Colocado en la misma fila, columna 3
+
+        # Botón para filtrar por fecha y grado
+        self.search_button = ttk.Button(filter_frame, text="Buscar por Filtros", command=self.handle_date_search)
+        self.search_button.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
+
+        # Botón para marcar acciones como "No reclamado"
+        self.mark_no_reclamado_button = ttk.Button(filter_frame, text="Finalizar Listado",
+                                                   command=self.handle_mark_no_reclamado)
+        self.mark_no_reclamado_button.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
+
+        # Treeview para mostrar resultados del estudiante y la fecha
+        tree_frame = tk.Frame(main_frame)
+        tree_frame.grid(row=3, column=0, sticky="nsew", pady=10)
+
+        self.tree = ttk.Treeview(tree_frame, columns=("Documento", "Nombres", "Apellidos", "Grado", "Acción", "Fecha"),
+                                 show="headings")
+        self.tree.heading("Documento", text="Documento")
+        self.tree.heading("Nombres", text="Nombres")
+        self.tree.heading("Apellidos", text="Apellidos")
+        self.tree.heading("Grado", text="Grado")
+        self.tree.heading("Acción", text="Acción")
+        self.tree.heading("Fecha", text="Fecha")
+        self.tree.pack(fill=tk.BOTH, expand=True)
+
+        # Configurar expansión de filas y columnas
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.rowconfigure(3, weight=1)
+
+        # Configurar expansión de filas y columnas
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.rowconfigure(3, weight=1)
+
+    def handle_barcode_scan(self, event):
+        """Este método maneja la lectura del código de barras"""
+        barcode = self.barcode_entry.get()
+        action_date = self.date_entry.get() or datetime.now().strftime(
+            '%Y-%m-%d')  # Tomar la fecha actual si no se ingresa
+
+        if not barcode.isdigit():
+            messagebox.showwarning("Advertencia", "El código de barras debe ser tu Documento de Identidad")
+            return
+
+        # Ejecutar el procedimiento almacenado con el código de barras y la fecha ingresada
+        results = self.db_connector.execute_procedure('FuncionEstudiantesAction', barcode)
+
+        if results:
+            for headers, rows in results:
+                self.display_results(headers, rows)
+        else:
+            messagebox.showinfo("Información", "No puedes registrarte fuera de los horarios permitidos")
+
+        # Limpiar el campo de entrada para el siguiente código de barras
+        self.barcode_entry.delete(0, tk.END)
+
+    def handle_date_search(self):
+        """Este método filtra las acciones por la fecha y opcionalmente por grado"""
+        action_date = self.date_entry.get()
+        student_grade = self.grade_entry.get() or 'Todos'  # Tomar 'Todos' como valor predeterminado si el campo está vacío
+
+        # Validar si se ingresó una fecha en el formato correcto
+        try:
+            datetime.strptime(action_date, '%Y-%m-%d')
+        except ValueError:
+            messagebox.showwarning("Advertencia", "La fecha debe ser de la manera YYYY-MM-DD")
+            return
+
+        # Ejecutar el procedimiento para filtrar por la fecha y opcionalmente por grado
+        results = self.db_connector.execute_procedure('FuncionEstudiantesActionByDate', action_date, student_grade)
+
+        if results:
+            for headers, rows in results:
+                self.display_results(headers, rows)
+        else:
+            messagebox.showinfo("Información", "No se encontraron resultados de esta fecha y grado")
+
+    def handle_mark_no_reclamado(self):
+        """Este método marca las acciones faltantes como 'No reclamado'"""
+        action_date = self.date_entry.get() or datetime.now().strftime('%Y-%m-%d')
+
+        # Validar si se ingresó una fecha en el formato correcto
+        try:
+            datetime.strptime(action_date, '%Y-%m-%d')
+        except ValueError:
+            messagebox.showwarning("Advertencia", "La fecha debe tener el formato YYYY-MM-DD")
+            return
+
+        # Ejecutar el procedimiento para marcar las acciones como no reclamadas
+        self.db_connector.execute_procedure('MarcarNoReclamado', action_date)
+
+        # Informar al usuario que las acciones se han marcado como "No reclamado"
+        messagebox.showinfo("Finalización", "Los estudiantes faltantes han sido marcados como 'No reclamado'")
+
+    def display_results(self, headers, rows):
+        # Limpiar el TreeView antes de mostrar nuevos resultados
+        self.tree.delete(*self.tree.get_children())
+
+        for row in rows:
+            self.tree.insert("", "end", values=row)
+
+
+# Clase del Código 1 (modificada)
+class Lista(tk.Tk):
+    def _init_(self, db_connector):
+        super()._init_()
+        self.db_connector = db_connector
+        self.title("Datos Estudiantes")
+        self.geometry("1000x800")
+
+        self.create_widgets()
+
+    def create_widgets(self):
+        # Frame principal
+        main_frame = ttk.Frame(self, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Frame información del estudiante
+        info_frame = tk.LabelFrame(main_frame, text="Información del Estudiante", padx=10, pady=10)
+        info_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        self.fields = ['Documento', 'Nombres', 'Apellidos', 'Grado']
+        self.entries = {}
+
+        for i, field in enumerate(self.fields):
+            ttk.Label(info_frame, text=field).grid(row=i, column=0, sticky=tk.W, padx=5, pady=5)
+            entry = ttk.Entry(info_frame, width=40)
+            entry.grid(row=i, column=1, padx=5, pady=5, sticky="ew")
+            self.entries[field] = entry
+
+        # Frame de botones CRUD
+        button_frame = tk.Frame(main_frame)
+        button_frame.grid(row=1, column=0, pady=10)
+
+        ttk.Button(button_frame, text="Buscar", command=self.search_estudiante).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Insertar", command=self.insert_estudiante).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Actualizar", command=self.update_estudiante).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Borrar", command=self.delete_estudiante).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Mostrar Todos", command=self.show_all_estudiante).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Limpiar", command=self.clear_fields).pack(side=tk.LEFT, padx=5)
+
+        # Botón para abrir la segunda ventana
+        ttk.Button(button_frame, text="Escáner", command=self.open_second_window).pack(side=tk.LEFT, padx=5)
+
+        # Treeview para mostrar estudiantes
+        tree_frame = tk.Frame(main_frame)
+        tree_frame.grid(row=2, column=0, sticky="nsew", pady=10)
+
+        self.tree = ttk.Treeview(tree_frame, columns=self.fields, show="headings")
+        for field in self.fields:
+            self.tree.heading(field, text=field)
+        self.tree.pack(fill=tk.BOTH, expand=True)
+
+        # Configurar expansión de filas y columnas
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.rowconfigure(2, weight=1)
+
+    def search_estudiante(self):
+        documento = self.entries['Documento'].get()
+
+        if documento.isdigit():
+            result = self.db_connector.execute_query(
+                f"SELECT Documento, Nombres, Apellidos, Grado FROM Estudiantes WHERE Documento = {documento}")
+
+            if result:
+                self.display_results(result)
+            else:
+                messagebox.showinfo("Información", "No se encontró el estudiante con ese documento")
+        else:
+            messagebox.showwarning("Advertencia", "El documento debe ser un número válido")
+
+    def insert_estudiante(self):
+        documento = self.entries['Documento'].get()
+        nombres = self.entries['Nombres'].get()
+        apellidos = self.entries['Apellidos'].get()
+        grado = self.entries['Grado'].get()
+
+        if documento.isdigit():
+            query = f"INSERT INTO Estudiantes (Documento, Nombres, Apellidos, Grado) VALUES ({documento}, '{nombres}', '{apellidos}', '{grado}')"
+            self.db_connector.execute_query(query)
+            messagebox.showinfo("Información", "Estudiante insertado correctamente")
+            self.clear_fields()
+            self.show_all_estudiante()
+        else:
+            messagebox.showwarning("Advertencia", "El documento debe ser un número válido")
+
+    def update_estudiante(self):
+        documento = self.entries['Documento'].get()
+        nombres = self.entries['Nombres'].get()
+        apellidos = self.entries['Apellidos'].get()
+        grado = self.entries['Grado'].get()
+
+        if documento.isdigit():
+            query = f"UPDATE Estudiantes SET Nombres = '{nombres}', Apellidos = '{apellidos}', Grado = '{grado}' WHERE Documento = {documento}"
+            self.db_connector.execute_query(query)
+            messagebox.showinfo("Información", "Estudiante actualizado correctamente")
+            self.clear_fields()
+            self.show_all_estudiante()
+        else:
+            messagebox.showwarning("Advertencia", "El documento debe ser un número válido")
+
+    def delete_estudiante(self):
+        documento = self.entries['Documento'].get()
+
+        if documento.isdigit():
+            query = f"DELETE FROM Estudiantes WHERE Documento = {documento}"
+            self.db_connector.execute_query(query)
+            messagebox.showinfo("Información", "Estudiante eliminado correctamente")
+            self.clear_fields()
+            self.show_all_estudiante()
+        else:
+            messagebox.showwarning("Advertencia", "El documento debe ser un número válido")
+
+    def show_all_estudiante(self):
+        result = self.db_connector.execute_query(
+            "SELECT Documento, Nombres, Apellidos, Grado FROM Estudiantes ORDER BY Apellidos, Nombres")
+
+        if result:
+            self.display_results(result)
+
+    def clear_fields(self):
+        for entry in self.entries.values():
+            entry.delete(0, tk.END)
+
+    def open_second_window(self):
+        SecondWindow(self.db_connector)
+
+    def display_results(self, rows):
+        # Limpiar el TreeView antes de mostrar nuevos resultados
+        self.tree.delete(*self.tree.get_children())
+
+        for row in rows:
+            self.tree.insert("", "end", values=row)
+
+
+# Clase con métodos para conectar y ejecutar consultas a la base de datos
+class DatabaseConnector:
+    def _init_(self, host, user, password, database):
+        self.host = host
+        self.user = user
+        self.password = password
+        self.database = database
+
+    def connect(self):
+        """Realiza la conexión a la base de datos"""
+        self.conn = mysql.connector.connect(
+            host=self.host,
+            user=self.user,
+            password=self.password,
+            database=self.database
+        )
+        self.cursor = self.conn.cursor()
+
+    def execute_query(self, query):
+        """Ejecuta una consulta SQL (SELECT)"""
+        self.connect()
+        self.cursor.execute(query)
+        rows = self.cursor.fetchall()
+        self.conn.commit()
+        self.conn.close()
+        return rows
+
+    def execute_procedure(self, procedure_name, *args):
+        """Ejecuta un procedimiento almacenado"""
+        self.connect()
+        self.cursor.callproc(procedure_name, args)
+
+        # Recopilar los resultados de todos los cursores
+        results = []
+        for result in self.cursor.stored_results():
+            results.append((result.column_names, result.fetchall()))
+
+        self.conn.commit()
+        self.conn.close()
+        return results
+
+
+# Main principal
+if _name_ == "_main_":
+    db_connector = DatabaseConnector(
+        host="localhost",
+        user="root",
+        password="",
+        database="sistemapae"
+    )
+
+    app = Lista(db_connector)
+    app.mainloop()
