@@ -1,0 +1,55 @@
+DELIMITER //
+CREATE PROCEDURE FuncionEstudiantesAction(IN est_id INT, IN action_date DATE)
+BEGIN
+    DECLARE estudiante_nombres VARCHAR(100);
+    DECLARE estudiante_apellidos VARCHAR(100);
+    DECLARE estudiante_grado VARCHAR(50);
+    DECLARE action_type VARCHAR(20);
+    DECLARE refrigerio_count INT DEFAULT 0;
+    DECLARE almuerzo_count INT DEFAULT 0;
+
+    -- Obtener los datos del estudiante
+    SELECT Nombres, Apellidos, Grado 
+    INTO estudiante_nombres, estudiante_apellidos, estudiante_grado
+    FROM estudiantes 
+    WHERE Documento = est_id;
+
+    -- Contar cuántas acciones ha realizado el estudiante en el día para cada tipo
+    SELECT COUNT(*) INTO refrigerio_count
+    FROM EstudiantesActions
+    WHERE Documento = est_id 
+      AND DATE(ActionTime) = action_date
+      AND Action = 'Refrigerio';
+
+    SELECT COUNT(*) INTO almuerzo_count
+    FROM EstudiantesActions
+    WHERE Documento = est_id 
+      AND DATE(ActionTime) = action_date
+      AND Action = 'Almuerzo';
+
+    -- Determinar la acción basada en la hora actual, respetando el límite de 2 acciones diarias
+    SET action_type = 'Fuera de horario';
+
+    IF CURRENT_TIME() BETWEEN '08:00:00' AND '10:00:00' THEN
+        IF refrigerio_count = 0 THEN
+            SET action_type = 'Refrigerio';
+        END IF;
+    ELSEIF CURRENT_TIME() BETWEEN '12:00:00' AND '13:40:00' THEN
+        IF almuerzo_count = 0 THEN
+            SET action_type = 'Almuerzo';
+        END IF;
+    END IF;
+
+    -- Insertar en la tabla de respaldo solo si la acción es válida (Refrigerio, Almuerzo, o Fuera de horario)
+    IF action_type != 'Fuera de horario' THEN
+        INSERT INTO EstudiantesActions (Documento, Nombres, Apellidos, Grado, ActionTime, Action)
+        VALUES (est_id, estudiante_nombres, estudiante_apellidos, estudiante_grado, NOW(), action_type);
+    END IF;
+
+    -- Devolver los datos del estudiante con la fecha proporcionada, ordenados por apellido
+    SELECT Documento, Nombres, Apellidos, Grado, ActionTime, Action
+    FROM EstudiantesActions
+    WHERE Documento = est_id AND DATE(ActionTime) = action_date
+    ORDER BY Apellidos;
+END //
+DELIMITER ;
