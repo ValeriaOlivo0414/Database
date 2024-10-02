@@ -1,0 +1,47 @@
+SQL
+USE escuela;
+
+-- Visualizar todos los estudiantes
+DELIMITER //
+CREATE PROCEDURE visualizar_estudiantes()
+BEGIN
+  SELECT * FROM Estudiantes;
+END //
+DELIMITER ;
+
+-- Insertar un nuevo estudiante
+DELIMITER //
+CREATE PROCEDURE insertar_estudiante(IN p_documento INT, IN p_nombres VARCHAR(100), IN p_apellidos VARCHAR(100), IN p_grado INT)
+BEGIN
+  INSERT INTO Estudiantes (Documento, Nombres, Apellidos, Grado)
+  VALUES (p_documento, p_nombres, p_apellidos, p_grado);
+END //
+DELIMITER ;
+
+-- Actualizar la información de un estudiante
+DELIMITER //
+CREATE PROCEDURE actualizar_estudiante(IN p_documento INT, IN p_nombres VARCHAR(100), IN p_apellidos VARCHAR(100), IN p_grado INT)
+BEGIN
+  UPDATE Estudiantes
+  SET Nombres = p_nombres, Apellidos = p_apellidos, Grado = p_grado
+  WHERE Documento = p_documento;
+END //
+DELIMITER ;
+
+-- Borrar un estudiante
+DELIMITER //
+CREATE PROCEDURE borrar_estudiante(IN p_documento INT)
+BEGIN
+  DELETE FROM Estudiantes
+  WHERE Documento = p_documento;
+END //
+DELIMITER ;
+
+-- Buscar un estudiante por ID
+DELIMITER //
+CREATE PROCEDURE buscar_estudiante_por_id(IN p_documento INT)
+BEGIN
+  SELECT * FROM Estudiantes
+  WHERE Documento = p_documento;
+END //
+DELIMITER ;
