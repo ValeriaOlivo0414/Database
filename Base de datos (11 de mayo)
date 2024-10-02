@@ -1,0 +1,18 @@
+-- Tabla para almacenar información del estudiante
+CREATE TABLE Estudiante (
+    Documento VARCHAR(20) PRIMARY KEY,
+    Nombre VARCHAR(100),
+    Institucion VARCHAR(100),
+    Grado VARCHAR(50),
+    Jornada VARCHAR(50)
+);
+
+-- Tabla para registrar el uso de servicios por parte de los estudiantes
+CREATE TABLE UsoServicio (
+    ID INT AUTO_INCREMENT PRIMARY KEY,
+    DocumentoEstudiante VARCHAR(20),
+    FechaUsoServicio DATE,
+    HoraAlmuerzo TIME,
+    HoraRefrigerio TIME,
+    FOREIGN KEY (DocumentoEstudiante) REFERENCES Estudiante(Documento)
+);
