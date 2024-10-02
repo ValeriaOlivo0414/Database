@@ -1,0 +1,37 @@
+import sqlite3
+from datetime import datetime
+
+def determinar_tipo_evento(hora_actual):
+    # Definir los rangos de tiempo para cada evento
+    if '09:30:00' <= hora_actual <= '10:00:00':
+        return 'refrigerio'
+    elif '13:00:00' <= hora_actual <= '13:30:00':
+        return 'almuerzo'
+    else:
+        return None  # Si no está en el rango, puedes retornar None o manejarlo como prefieras
+
+# Conectar a la base de datos
+conn = sqlite3.connect('pae.db')
+cursor = conn.cursor()
+
+# Ejemplo de código de barras escaneado (documento del estudiante)
+codigo_barras = '1234567890'  # Documento del estudiante
+
+# Fecha y hora actuales
+fecha_actual = datetime.now().strftime('%Y-%m-%d')
+hora_actual = datetime.now().strftime('%H:%M:%S')
+
+# Determinar el tipo de evento basado en la hora
+tipo_evento = determinar_tipo_evento(hora_actual)
+
+# Solo insertar si está en el rango de tiempo correcto
+if tipo_evento:
+    cursor.execute('''
+        INSERT INTO EventosAlimenticios (Documento, Fecha, Hora, Tipo_evento)
+        VALUES (?, ?, ?, ?)
+    ''', (codigo_barras, fecha_actual, hora_actual, tipo_evento))
+
+    conn.commit()  # Guardar los cambios
+
+# Cerrar la conexión
+conn.close()
